@@ -13,6 +13,7 @@ import gc
 import random
 import filetype
 from langchain.llms import Ollama
+from transformers import pipeline
 
 
 def addapt_numpy_float64(numpy_float64):
@@ -173,6 +174,9 @@ table_name = f"table_{random.randint(0, 1000000)}"
 st.title('Akilli')
 st.header('Проверка ТЗ на соответствие требованиям ВПЦТ')
 
+with st.spinner("initialize application..."):
+    pipe_fb = pipeline("translation", model="facebook/wmt19-en-ru", max_length=1024, device=0)
+
 option = st.selectbox(
     'Выберите ВПЦТ',
     ('МинОбрНаука', 'МинКультуры'))
@@ -267,13 +271,13 @@ if uploaded_file is not None:
             Requirement: {query}
 
             Answer the question: Does the given context satisfy the requirement?
-            Answer "yes" or "no". Give a short answer.
+            Answer "yes" or "no". Think step by step. Give a short answer.
         """
 
         st.subheader("Требование")
         st.write(query)
         st.subheader("Анализ")
-        st.write(llm(prompt))
+        st.write(pipe_fb(llm(prompt))[0]['translation_text'])
 
 
     del model, df, docs, result, splitted_text, documents, uploaded_file
