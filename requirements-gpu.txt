@@ -87,3 +87,5 @@ validators==0.22.0
 watchdog==3.0.0
 yarl==1.9.4
 zipp==3.17.0
+docx2txt==0.8
+filetype==1.2.0

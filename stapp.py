@@ -169,7 +169,8 @@ queries_mk = [
 table_name = f"table_{random.randint(0, 1000000)}"
 
 # st.set_page_config(layout="wide")
-st.title('Проверка ТЗ на соответствие требованиям ВПЦТ')
+st.title('Akilli')
+st.header('Проверка ТЗ на соответствие требованиям ВПЦТ')
 
 option = st.selectbox(
     'Выберите ВПЦТ',
