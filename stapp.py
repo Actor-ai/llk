@@ -110,6 +110,7 @@ db_host = os.environ['APP_DB_HOST']
 db_user = os.environ['APP_DB_USER']
 db_password = os.environ['APP_DB_PASS']
 db = os.environ['APP_DB']
+llm_model_name = os.environ['LLM']
 models_dir = "./models"
 
 # Database connection details
@@ -199,8 +200,9 @@ if uploaded_file is not None:
  #       llm = Ollama(base_url='http://ollama_llm:11434', model="mistral:7b-instruct")
  #       llm = Ollama(base_url='http://ollama_llm:11434', model="mistral:7b-instruct-v0.2-q8_0")
  #       llm = Ollama(base_url='http://ollama_llm:11434', model="mistral:7b-instruct-v0.2-fp16")
-        llm = Ollama(base_url='http://ollama_llm:11434', model="orca2:13b")
  #       llm = Ollama(base_url='http://ollama_llm:11434', model="zephyr:7b-beta")
+        llm = Ollama(base_url='http://ollama_llm:11434', model=llm_model_name, temperature=0.5)
+
 
     with st.spinner('Preprocess...'):
 
@@ -265,7 +267,7 @@ if uploaded_file is not None:
             Requirement: {query}
 
             Answer the question: Does the given context satisfy the requirement?
-            Answer "yes" or "no". Answer in native Russian only!
+            Answer "yes" or "no". Give a short answer.
         """
 
         st.subheader("Требование")
