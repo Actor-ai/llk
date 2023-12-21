@@ -132,3 +132,5 @@ data
 uploaded/*
 pgdata
 .huggingface_cache
+models_cache
+.ollama

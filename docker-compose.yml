@@ -59,7 +59,7 @@ services:
       - ./:/app
       - ./uploaded:/app/uploaded
       - ./.streamlit:/app/.streamlit
-      - ./.models_cache:/app/.models_cache
+      - ./models_cache:/app/.models_cache
     command:
       streamlit run stapp.py --server.enableXsrfProtection=false --server.enableCORS=false
 
@@ -67,7 +67,7 @@ volumes:
   pgdata:
   uploaded:
   .streamlit:
-  .models_cache:
+  models_cache:
   .ollama:
 
 
