@@ -1,5 +1,5 @@
 import streamlit as st
-from langchain.document_loaders import PyPDFLoader
+from langchain.document_loaders import PyPDFLoader, Docx2txtLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 import re
 import psycopg2
@@ -11,6 +11,8 @@ import os
 import pandas as pd
 import gc
 import random
+import filetype
+from langchain.llms import Ollama
 
 
 def addapt_numpy_float64(numpy_float64):
@@ -42,7 +44,6 @@ register_adapter(numpy.int32, addapt_numpy_int32)
 
 
 text_splitter = RecursiveCharacterTextSplitter(
-    # Set a really small chunk size, just to show.
     chunk_size=512,
     chunk_overlap=256,
     length_function=len,
@@ -73,6 +74,7 @@ def add_docs(table_name, docs):
                 text = doc.page_content
                 ltext = doc.page_content.lower()
                 embedding = model.encode(ltext)
+#                embedding = model.embed_query(ltext)
                 cur.execute(
                     f"""
                     INSERT INTO {table_name} (text_split, ltext_split, embedding) 
@@ -91,19 +93,18 @@ def get_candidates(table_name, query, k):
     with psycopg2.connect(DATABASE_URL) as conn:
         with conn.cursor() as cur:
             embedding = model.encode(query.lower())
+#            embedding = model.embed_query(query.lower())
             # K is the number of top K nearest neighbors
             cur.execute(f"""
                 SELECT
-                    text_split, embedding <=> '{embedding.tolist()}' AS cos_distanse 
+                    text_split, embedding <=> '{embedding.tolist()}' AS distanse 
                     FROM {table_name} 
-                    ORDER BY cos_distanse 
+                    ORDER BY distanse 
                     LIMIT {k}
             """)
             top_k_candidates = cur.fetchall()
     return top_k_candidates
 
-
-#DATABASE_URL = f"postgres://llkuser:P4llkuser#@localhost:5432/llk_rag"
 
 db_host = os.environ['APP_DB_HOST']
 db_user = os.environ['APP_DB_USER']
@@ -113,10 +114,9 @@ models_dir = "./models"
 
 # Database connection details
 DATABASE_URL = f"postgres://{db_user}:{db_password}@{db_host}:5432/{db}"
-#DATABASE_URL = f"postgres://llkuser:P4llkuser#@localhost:5432/llk_rag"
 EMBEDDING_DIM = 1024  # Adjust according to your embedding model
 
-queries = [
+queries_mon = [
     "Цифровизация системы государственной научной аттестации, в том числе развитие ФИС ГНА",
     "Развитие суперсервиса \"Поступление в ВУЗ онлайн\" и создание типовых решений для образовательных организаций высшего образования, в том числе за счет развития ГИС \"Современная цифровая образовательная среда\"",
     "Внедрение и развитие на базе инфраструктуры НИКС набора специализированных сервисов в интересах сферы науки и образования России",
@@ -134,9 +134,36 @@ queries = [
     "Обеспечение функционирования компонентов информационно-телекоммуникационной инфраструктуры",
 ]
 
-
-
-#    model = torch.compile(model)
+queries_mk = [
+    "Цифровая трансформация государственного управления, государственных услуг (функций), контрольной надзорной деятельности",
+    "Развитие платформы АИС ЕИПСК (PRO Культура)",
+    "Развитие Единой автоматизированной системы поддержки оказания государственных услуг Минкультуры России:",
+    "Развитие Государственного каталога музейного фонда Российской Федерации",
+    "Развитие СЭД Дело",
+    "Развитие АИС ЕГРОКН",
+    "Создание и развитие информационно-телекоммуникационной инфраструктуры и технологических сервисов",
+    "Обеспечение функционирования информационных систем и компонентов информационно-телекоммуникационной системы",
+    "Единый государственный реестр памятников истории и культуры народов Российской Федерации",
+    "Эксплуатация АИС Статистика",
+    "Эксплуатация Государственного каталога музейного фонда Российской Федерации",
+    "Эксплуатация платформы открытых данных Минкультуры России",
+    "Эксплуатация ЕАС Минкультуры России",
+    "Эксплуатация АИС УПБ",
+    "Эксплуатация единой интеграционной платформы",
+    "Эксплуатация АИС ЕИПСК (PRO Культура)",
+    "Эксплуатация официального сайта Минкультуры России",
+    "Эксплуатация платформы дополненной реальности",
+    "Эксплуатация портала Культура.РФ",
+    "Эксплуатация системы защиты информации",
+    "Эксплуатация информационной системы БОР-навигатор",
+    "Эксплуатация ЕАС \"Госуслуги\"",
+    "Эксплуатация ИАС УПФД",
+    "Эксплуатация Информационно-справочных сервисов",
+    "Эксплуатация информационно-коммуникационной инфраструктуры",
+    "Эксплуатация рабочих станций",
+    "Эксплуатация услуг связи",
+    "Эксплуатация СЭД Дело",
+]
 
 
 table_name = f"table_{random.randint(0, 1000000)}"
@@ -144,7 +171,16 @@ table_name = f"table_{random.randint(0, 1000000)}"
 # st.set_page_config(layout="wide")
 st.title('Проверка ТЗ на соответствие требованиям ВПЦТ')
 
-uploaded_file = st.file_uploader("Choose a file")
+option = st.selectbox(
+    'Выберите ВПЦТ',
+    ('МинОбрНаука', 'МинКультуры'))
+
+if option == 'МинКультуры':
+    queries = queries_mk
+else:
+    queries = queries_mon
+
+uploaded_file = st.file_uploader("Choose a file. PDF and DOCX formats are supported.")
 if uploaded_file is not None:
     st.text(f"File is uploaded: {uploaded_file.name}")
 
@@ -155,10 +191,28 @@ if uploaded_file is not None:
 
     with st.spinner("Initialize embedding model..."):
         model_path = 'ai-forever/sbert_large_mt_nlu_ru'  # threshold 0.13, dimesionality 1024
-        model = SentenceTransformer(model_path)
+        model = SentenceTransformer(model_path, cache_folder='./models_cache')
+#        model = OllamaEmbeddings(model="mistral:7b")
+
+    with st.spinner("Initialize LLM service..."):
+ #       llm = Ollama(base_url='http://ollama_llm:11434', model="mistral:7b-instruct")
+ #       llm = Ollama(base_url='http://ollama_llm:11434', model="mistral:7b-instruct-v0.2-q8_0")
+ #       llm = Ollama(base_url='http://ollama_llm:11434', model="mistral:7b-instruct-v0.2-fp16")
+        llm = Ollama(base_url='http://ollama_llm:11434', model="orca2:13b")
+ #       llm = Ollama(base_url='http://ollama_llm:11434', model="zephyr:7b-beta")
 
     with st.spinner('Preprocess...'):
-        loader = PyPDFLoader(file_path)
+
+        kind = filetype.guess(file_path)
+        if kind.mime == 'application/pdf':
+            loader = PyPDFLoader(file_path)
+        elif kind.mime == 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+            loader = Docx2txtLoader(file_path)
+        else:
+            st.text("Unsupported file format")
+            st.stop()
+
+#        loader = PyPDFLoader(file_path)
         documents = loader.load()
 
         pattern = r"^\d+"
@@ -189,11 +243,37 @@ if uploaded_file is not None:
     threshold = 0.13
     df['Satisfied'] = df['Score'].apply(lambda x: True if x < threshold else False)
 
+    st.header("Анализ ТЗ на основе близости векторов текста требования и ТЗ")
+
     st.text("ТЗ удовлетворяет требованиям ВПЦТ" if True in df['Satisfied'].unique() else "ТЗ НЕ удовлетворяет требованиям ВПЦТ")
 
     st.dataframe(df)
 
-    del model, df, docs, result, splitted_text, documents
+    st.header("Анализ ТЗ большой языковой моделью (LLM)")
+
+    for query in queries:
+        candidates = get_candidates(table_name, query, 1)
+
+        context = candidates[0][0]
+
+        prompt = f"""
+            Look on the context and requirement:
+
+            Context:{context}
+
+            Requirement: {query}
+
+            Answer the question: Does the given context satisfy the requirement?
+            Answer "yes" or "no". Answer in native Russian only!
+        """
+
+        st.subheader("Требование")
+        st.write(query)
+        st.subheader("Анализ")
+        st.write(llm(prompt))
+
+
+    del model, df, docs, result, splitted_text, documents, uploaded_file
     gc.collect()
 
 
