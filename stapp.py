@@ -174,8 +174,8 @@ table_name = f"table_{random.randint(0, 1000000)}"
 st.title('Akilli')
 st.header('Проверка ТЗ на соответствие требованиям ВПЦТ')
 
-with st.spinner("initialize application..."):
-    pipe_fb = pipeline("translation", model="facebook/wmt19-en-ru", max_length=1024, device=0)
+# with st.spinner("initialize application..."):
+#     pipe_fb = pipeline("translation", model="facebook/wmt19-en-ru", max_length=1024, device=0)
 
 option = st.selectbox(
     'Выберите ВПЦТ',
@@ -277,7 +277,8 @@ if uploaded_file is not None:
         st.subheader("Требование")
         st.write(query)
         st.subheader("Анализ")
-        st.write(pipe_fb(llm(prompt))[0]['translation_text'])
+#        st.write(pipe_fb(llm(prompt))[0]['translation_text'])
+        st.write(llm(prompt))
 
 
     del model, df, docs, result, splitted_text, documents, uploaded_file
